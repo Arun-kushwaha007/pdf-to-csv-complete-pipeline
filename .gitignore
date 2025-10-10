@@ -1,0 +1,16 @@
+/.gcloudignore
+/app.py
+/config.env
+/debug_name_parsing.py
+/DEPLOYMENT_GUIDE.md
+/diagnose_processor.py
+/dockerfile
+/error_handler.py
+/FINAL_IMPROVEMENTS_SUMMARY.md
+/IMPROVEMENTS_SUMMARY.md
+/pdf2csv-converter-tool-ee510faebb5c.json
+/README.md
+/requirements.txt
+/STRICT_VALIDATION_SUMMARY.md
+/working_document_processor.py
+/__pycache__
