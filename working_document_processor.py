@@ -219,7 +219,7 @@ class WorkingDocumentProcessor:
         # Address-word blacklist (whole words)
         address_words = ['street', 'avenue', 'road', 'drive', 'lane', 'court', 'place', 'way',
                         'crescent', 'close', 'terrace', 'parade', 'boulevard', 'gordonvale',
-                        'qld', 'nsw', 'vic', 'wa', 'sa', 'tas', 'nt', 'act', 'munno', 'para']
+                        'qld', 'nsw', 'vic', 'wa', 'sa', 'tas', 'nt', 'act',]
 
         name_lower = name.lower()
         for word in address_words:
@@ -306,7 +306,7 @@ class WorkingDocumentProcessor:
                 if len(address) < 10:
                     address_clean = ""
                 # Check if first 5 characters contain at least one number
-                elif not re.search(r'\d', address[:5]):
+                elif not re.search(r'\d', address[:10]):
                     address_clean = ""
             
             # Address is required
