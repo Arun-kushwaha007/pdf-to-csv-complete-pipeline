@@ -19,7 +19,7 @@ class GCPDeployer:
         self.frontend_service_name = "pdf2csv-frontend"
         self.db_instance_name = "pdf2csv-db"
         self.db_name = "pdf2csv_db"
-        self.db_user = "postgres"
+        self.db_user = "pdf2csv_user"
         self.db_password = "@Sharing1234"
         
     def run_command(self, command, check=True):
