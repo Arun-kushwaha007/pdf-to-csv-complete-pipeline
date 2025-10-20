@@ -128,13 +128,26 @@ class GCPDeployer:
             print("❌ Frontend directory not found")
             sys.exit(1)
         
-        # Install dependencies
+        # Clean previous build
+        print("Cleaning previous build...")
+        self.run_command("cd frontend && rm -rf node_modules package-lock.json build", check=False)
+        
+        # Install dependencies with legacy peer deps
         print("Installing frontend dependencies...")
-        self.run_command("cd frontend && npm install")
+        result = self.run_command("cd frontend && npm install --legacy-peer-deps", check=False)
+        if result.returncode != 0:
+            print("❌ Failed to install dependencies")
+            print(f"Error: {result.stderr}")
+            sys.exit(1)
         
         # Build for production
         print("Building frontend for production...")
-        self.run_command("cd frontend && npm run build")
+        result = self.run_command("cd frontend && npm run build", check=False)
+        if result.returncode != 0:
+            print("❌ Failed to build frontend")
+            print(f"Error: {result.stderr}")
+            print(f"Output: {result.stdout}")
+            sys.exit(1)
         
         print("✅ Frontend build complete")
     
