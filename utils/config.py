@@ -4,7 +4,7 @@ Configuration management
 
 import os
 from typing import Optional
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     # Google Cloud Configuration
@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     DB_HOST: str = "34.58.120.64"
     DB_PORT: int = 5432
     DB_NAME: str = "pdf2csv_db"
-    DB_USER: str = "postgres"
+    DB_USER: str = "pdf2csv_user"
     DB_PASSWORD: str = "@Sharing1234"
     DB_SSL: bool = True
     DB_SOCKET_PATH: Optional[str] = "/cloudsql/pdf2csv-475708:us-central1:pdf2csv-db"

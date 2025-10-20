@@ -4,6 +4,7 @@ Document processing service using Google Cloud Document AI
 
 import os
 import logging
+import re
 from typing import List, Dict, Optional
 from google.cloud import documentai_v1 as documentai
 from google.api_core.client_options import ClientOptions
