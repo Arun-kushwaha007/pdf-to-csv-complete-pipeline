@@ -36,3 +36,7 @@ google-auth==2.23.3
 nameparser==1.1.2
 python-dotenv==1.0.0
 openpyxl==3.1.2
+
+# Database dependencies
+psycopg2-binary==2.9.7
+sqlalchemy==2.0.23

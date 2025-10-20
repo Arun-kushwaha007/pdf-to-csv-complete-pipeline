@@ -1,4 +1,3 @@
-
 import os
 import re
 import pandas as pd
@@ -303,7 +302,7 @@ class WorkingDocumentProcessor:
             if address:
                 address = address.strip()
                 # Remove addresses that are too short
-                if len(address) < 10:
+                if len(address) < 15:
                     address_clean = ""
                 # Check if first 5 characters contain at least one number
                 elif not re.search(r'\d', address[:10]):
@@ -475,3 +474,57 @@ class WorkingDocumentProcessor:
         
         wb.save(output_path)
         logger.info(f"Saved {len(batch_data)} batches to {output_path}")
+    
+    def group_pdfs_by_count(self, pdf_files: List[str], group_size: int = 25) -> List[List[str]]:
+        """Group PDF files by count instead of records"""
+        groups = []
+        for i in range(0, len(pdf_files), group_size):
+            group = pdf_files[i:i + group_size]
+            groups.append(group)
+        return groups
+    
+    def process_pdf_group(self, pdf_group: List[str], processor_id: str) -> Dict:
+        """Process a group of PDFs and return combined results"""
+        all_raw_records = []
+        all_filtered_records = []
+        group_results = []
+        
+        for pdf_path in pdf_group:
+            try:
+                result = self.process_document(pdf_path, processor_id)
+                raw_records = result.get('raw_records', [])
+                filtered_records = result.get('filtered_records', [])
+                
+                # Add source file information to each record
+                for record in raw_records:
+                    record['source_file'] = os.path.basename(pdf_path)
+                for record in filtered_records:
+                    record['source_file'] = os.path.basename(pdf_path)
+                
+                all_raw_records.extend(raw_records)
+                all_filtered_records.extend(filtered_records)
+                
+                group_results.append({
+                    'file': os.path.basename(pdf_path),
+                    'status': 'success',
+                    'raw_count': len(raw_records),
+                    'filtered_count': len(filtered_records)
+                })
+                
+            except Exception as e:
+                group_results.append({
+                    'file': os.path.basename(pdf_path),
+                    'status': 'error',
+                    'error': str(e),
+                    'raw_count': 0,
+                    'filtered_count': 0
+                })
+                logger.error(f"Error processing {pdf_path}: {e}")
+        
+        return {
+            'raw_records': all_raw_records,
+            'filtered_records': all_filtered_records,
+            'group_results': group_results,
+            'total_files': len(pdf_group),
+            'successful_files': len([r for r in group_results if r['status'] == 'success'])
+        }
