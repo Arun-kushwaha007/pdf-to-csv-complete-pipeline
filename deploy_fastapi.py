@@ -162,7 +162,7 @@ class GCPDeployer:
         
         # Build for production
         print("Building frontend for production...")
-        result = self.run_command("cd frontend && npm run build", check=False)
+        result = self.run_command("cd frontend && NODE_OPTIONS='--openssl-legacy-provider' npm run build", check=False)
         if result.returncode != 0:
             print("❌ Failed to build frontend")
             print(f"Error: {result.stderr}")
@@ -170,7 +170,7 @@ class GCPDeployer:
             
             # Try building with different Node options
             print("Trying build with different Node options...")
-            result = self.run_command("cd frontend && NODE_OPTIONS='--max-old-space-size=4096' npm run build", check=False)
+            result = self.run_command("cd frontend && NODE_OPTIONS='--openssl-legacy-provider --max-old-space-size=4096' npm run build", check=False)
             if result.returncode != 0:
                 print("❌ Build failed even with increased memory")
                 print(f"Error: {result.stderr}")

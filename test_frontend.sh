@@ -33,7 +33,7 @@ npm install ajv-keywords@^3.5.2 --legacy-peer-deps --force 2>/dev/null || true
 
 # Test build
 echo "🏗️ Testing build..."
-npm run build
+NODE_OPTIONS='--openssl-legacy-provider' npm run build
 
 if [ $? -eq 0 ]; then
     echo "✅ Frontend build test successful!"
