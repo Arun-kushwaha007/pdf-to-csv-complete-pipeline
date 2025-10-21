@@ -135,15 +135,30 @@ class GCPDeployer:
         
         # Clean previous build
         print("Cleaning previous build...")
-        self.run_command("cd frontend && rm -rf node_modules package-lock.json build", check=False)
+        self.run_command("cd frontend && rm -rf node_modules package-lock.json build .npm", check=False)
         
-        # Install dependencies with legacy peer deps
+        # Clear npm cache
+        print("Clearing npm cache...")
+        self.run_command("cd frontend && npm cache clean --force", check=False)
+        
+        # Install dependencies with specific flags for compatibility
         print("Installing frontend dependencies...")
-        result = self.run_command("cd frontend && npm install --legacy-peer-deps", check=False)
+        result = self.run_command("cd frontend && npm install --legacy-peer-deps --force", check=False)
         if result.returncode != 0:
             print("❌ Failed to install dependencies")
             print(f"Error: {result.stderr}")
-            sys.exit(1)
+            print("Trying alternative installation method...")
+            
+            # Try with different flags
+            result = self.run_command("cd frontend && npm install --no-optional --legacy-peer-deps", check=False)
+            if result.returncode != 0:
+                print("❌ Alternative installation also failed")
+                print(f"Error: {result.stderr}")
+                sys.exit(1)
+        
+        # Fix ajv dependency issue specifically
+        print("Fixing ajv dependency issues...")
+        self.run_command("cd frontend && npm install ajv@^6.12.6 ajv-keywords@^3.5.2 --legacy-peer-deps", check=False)
         
         # Build for production
         print("Building frontend for production...")
@@ -152,7 +167,14 @@ class GCPDeployer:
             print("❌ Failed to build frontend")
             print(f"Error: {result.stderr}")
             print(f"Output: {result.stdout}")
-            sys.exit(1)
+            
+            # Try building with different Node options
+            print("Trying build with different Node options...")
+            result = self.run_command("cd frontend && NODE_OPTIONS='--max-old-space-size=4096' npm run build", check=False)
+            if result.returncode != 0:
+                print("❌ Build failed even with increased memory")
+                print(f"Error: {result.stderr}")
+                sys.exit(1)
         
         print("✅ Frontend build complete")
     
