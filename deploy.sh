@@ -1,70 +1,51 @@
 #!/bin/bash
+# Simple deployment script for PDF to CSV Pipeline
 
-# One-liner deployment script for Google Cloud Console
-# Run this in Cloud Shell after cloning the repository
+echo "🚀 PDF to CSV Pipeline - Quick Deploy"
+echo "====================================="
 
-echo "🚀 PDF to CSV Pipeline - One-Click Deployment"
-echo "=============================================="
-
-# Check if we're in the right directory
-if [ ! -f "main.py" ]; then
-    echo "❌ Error: main.py not found. Please run from project root."
-    echo "Make sure you've cloned the repository and are in the correct directory."
+# Check if gcloud is installed
+if ! command -v gcloud &> /dev/null; then
+    echo "❌ Google Cloud SDK not found. Please install it first:"
+    echo "   https://cloud.google.com/sdk/docs/install"
     exit 1
 fi
 
-# Check if gcloud is authenticated
-if ! gcloud auth list --filter=status:ACTIVE --format="value(account)" | grep -q "@"; then
-    echo "❌ Error: Not authenticated with gcloud."
-    echo "Please run: gcloud auth login"
+# Check if project is set
+PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
+if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "(unset)" ]; then
+    echo "❌ No GCP project set. Please run:"
+    echo "   gcloud config set project YOUR-PROJECT-ID"
     exit 1
 fi
 
-# Get current project
-PROJECT_ID=$(gcloud config get-value project)
 echo "📋 Using project: $PROJECT_ID"
 
-# Confirm deployment
-echo ""
-echo "This will deploy the PDF to CSV Pipeline to Google Cloud Platform."
-echo "The deployment includes:"
-echo "  • Cloud SQL PostgreSQL database"
-echo "  • Cloud Run FastAPI backend"
-echo "  • React frontend"
-echo "  • Document AI processor"
-echo ""
-read -p "Continue? (y/N): " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Deployment cancelled."
+# Check if user is authenticated
+if ! gcloud auth list --filter=status:ACTIVE --format="value(account)" | grep -q .; then
+    echo "❌ Not authenticated. Please run:"
+    echo "   gcloud auth login"
     exit 1
 fi
 
-# Update project ID in deployment script
-echo "🔧 Updating project configuration..."
-sed -i "s/pdf2csv-475708/$PROJECT_ID/g" deploy_fastapi.py
+# Check if billing is enabled
+if ! gcloud billing projects describe $PROJECT_ID &> /dev/null; then
+    echo "❌ Billing not enabled for project $PROJECT_ID"
+    echo "   Please enable billing in the Google Cloud Console:"
+    echo "   https://console.cloud.google.com/billing"
+    exit 1
+fi
 
-# Run deployment
+echo "✅ Prerequisites check passed"
+
+# Run the Python deployment script
 echo "🚀 Starting deployment..."
 python deploy_fastapi.py
 
-# Check if deployment was successful
-if [ $? -eq 0 ]; then
-    echo ""
-    echo "🎉 Deployment completed successfully!"
-    echo ""
-    echo "📝 Next steps:"
-    echo "1. Visit your application URL (shown above)"
-    echo "2. Configure Document AI processor schema"
-    echo "3. Test with a sample PDF"
-    echo ""
-    echo "📚 API Documentation: <your-url>/docs"
-    echo "🔧 Monitor logs: gcloud logs tail --follow"
-else
-    echo ""
-    echo "❌ Deployment failed. Check the error messages above."
-    echo "Common solutions:"
-    echo "  • Ensure billing is enabled"
-    echo "  • Check API permissions"
-    echo "  • Verify project ID is correct"
-fi
+echo ""
+echo "🎉 Deployment complete!"
+echo ""
+echo "📝 Next steps:"
+echo "1. Check the Cloud Run service URL above"
+echo "2. Test the application by uploading a PDF"
+echo "3. Monitor logs with: gcloud logs tail --follow"

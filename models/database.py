@@ -15,10 +15,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Database configuration
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    f"postgresql://{os.getenv('DB_USER', 'postgres')}:{os.getenv('DB_PASSWORD', '')}@{os.getenv('DB_HOST', 'localhost')}:{os.getenv('DB_PORT', '5432')}/{os.getenv('DB_NAME', 'pdf2csv_db')}"
-)
+# Check if running in Cloud Run (has DB_SOCKET_PATH)
+DB_SOCKET_PATH = os.getenv("DB_SOCKET_PATH")
+if DB_SOCKET_PATH:
+    # Use Unix socket for Cloud Run
+    DATABASE_URL = f"postgresql+psycopg2://{os.getenv('DB_USER', 'pdf2csv_user')}:{os.getenv('DB_PASSWORD', '')}@/{os.getenv('DB_NAME', 'pdf2csv_db')}?host={DB_SOCKET_PATH}"
+else:
+    # Use TCP for local development
+    DATABASE_URL = f"postgresql://{os.getenv('DB_USER', 'pdf2csv_user')}:{os.getenv('DB_PASSWORD', '')}@{os.getenv('DB_HOST', 'localhost')}:{os.getenv('DB_PORT', '5432')}/{os.getenv('DB_NAME', 'pdf2csv_db')}"
 
 # Create engine
 engine = create_engine(DATABASE_URL, echo=False)
