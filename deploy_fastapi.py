@@ -52,7 +52,7 @@ class GCPDeployer:
         
         # Check if authenticated
         try:
-            result = self.run_command("gcloud auth list --filter=status:ACTIVE --format=value(account)")
+            result = self.run_command('gcloud auth list --filter=status:ACTIVE --format="value(account)"')
             if not result.stdout.strip():
                 print("❌ Not authenticated with gcloud. Please run 'gcloud auth login'")
                 sys.exit(1)
