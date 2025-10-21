@@ -158,7 +158,7 @@ class GCPDeployer:
         
         # Fix ajv dependency issue specifically
         print("Fixing ajv dependency issues...")
-        self.run_command("cd frontend && npm install ajv@^6.12.6 ajv-keywords@^3.5.2 --legacy-peer-deps", check=False)
+        self.run_command("cd frontend && npm install ajv@^6.12.6 --legacy-peer-deps", check=False)
         
         # Build for production
         print("Building frontend for production...")
