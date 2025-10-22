@@ -57,3 +57,6 @@ frontend/build/
 # Google Cloud credentials
 *.json
 !package*.json
+
+config.env
+
