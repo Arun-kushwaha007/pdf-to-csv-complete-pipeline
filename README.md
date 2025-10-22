@@ -8,7 +8,6 @@ Original document processor for extracting contact information from PDFs using G
 - **Relaxed Address Regex**: More flexible address pattern matching
 - **Multiple Output Formats**: CSV and Excel output with summary sheets
 - **Duplicate Detection**: Find duplicate records based on mobile numbers
-- **Database Storage**: PostgreSQL integration for storing raw and filtered records
 - **Address Ordering Fix**: Automatically fixes Document AI address ordering issues
 - **Streamlit Web UI**: Easy-to-use web interface for processing and viewing data
 
@@ -20,16 +19,11 @@ Original document processor for extracting contact information from PDFs using G
    ```
 
 2. **Configure environment**:
-   - Update `config.env` with your Google Cloud and database settings
+   - Update `config.env` with your Google Cloud settings
    - Add your Google Cloud credentials JSON file
-   - Set your Document AI processor ID and database connection details
+   - Set your Document AI processor ID
 
-3. **Setup database** (first time only):
-   ```bash
-   python setup_database.py
-   ```
-
-4. **Run processing**:
+3. **Run processing**:
    ```bash
    # Use the Streamlit web app (recommended)
    python run_app.py
@@ -47,13 +41,6 @@ PROJECT_ID=your-project-id
 LOCATION=us
 PROCESSOR_ID=your-processor-id
 GOOGLE_APPLICATION_CREDENTIALS=./credentials.json
-
-# Database Configuration
-DB_HOST=your-cloud-sql-ip
-DB_PORT=5432
-DB_NAME=pdf2csv_db
-DB_USER=pdf2csv_user
-DB_PASSWORD=your-db-password
 
 # Output Configuration
 OUTPUT_DIR=output
@@ -119,15 +106,14 @@ duplicates = processor.detect_duplicates(results)
 
 ## Streamlit Web App
 
-The easiest way to test the document processor is using the Streamlit web app with database integration:
+The easiest way to test the document processor is using the Streamlit web app:
 
 ### Features
 - **Upload PDFs**: Drag and drop multiple PDF files
-- **Process & Store**: Extract data and save to PostgreSQL database
-- **View Database Records**: Browse stored raw and filtered records
-- **Toggle Views**: Switch between raw and filtered data
+- **Process Files**: Extract data using Document AI
+- **View Results**: See both raw and filtered data side by side
 - **Download Options**: Get CSV, Excel, or ZIP files
-- **Database Stats**: View processing statistics
+- **Address Fixing**: Automatically fixes Document AI address ordering issues
 
 ### Usage
 
@@ -140,15 +126,9 @@ The easiest way to test the document processor is using the Streamlit web app wi
 
 3. **Upload PDF files** and click "Process Files"
 
-4. **View Database Records** section to browse stored data
+4. **View results** in the interface
 
 5. **Download results** as CSV or Excel
-
-### Database Features
-- **Automatic Storage**: All processed data is saved to PostgreSQL
-- **Duplicate Handling**: Filtered records prevent duplicate mobile numbers
-- **Session Tracking**: Track processing batches with timestamps
-- **Data Persistence**: View and download previously processed data
 
 ### Features:
 - ✅ Upload multiple PDF files

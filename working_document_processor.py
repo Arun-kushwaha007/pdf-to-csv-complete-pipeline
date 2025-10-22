@@ -5,31 +5,22 @@ from google.cloud import documentai_v1 as documentai
 from google.api_core.client_options import ClientOptions
 from typing import List, Dict
 import logging
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class WorkingDocumentProcessor:
-    def __init__(self, project_id: str, location: str, processor_id: str, credentials_path: str, db_config: Dict = None):
+    def __init__(self, project_id: str, location: str, processor_id: str, credentials_path: str):
         self.project_id = project_id
         self.location = location
         self.processor_id = processor_id
         self.credentials_path = credentials_path
-        self.db_config = db_config
         
         # Set credentials
         os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_path
         
         opts = ClientOptions(api_endpoint=f"{location}-documentai.googleapis.com")
         self.client = documentai.DocumentProcessorServiceClient(client_options=opts)
-        
-        # Initialize database connection if config provided
-        self.db_connection = None
-        if db_config:
-            self._init_database()
     
     def process_document(self, file_path: str) -> List[Dict]:
         """Process a single document and return both raw and filtered records"""
@@ -99,18 +90,21 @@ class WorkingDocumentProcessor:
     def _simple_grouping(self, entities: List[Dict]) -> List[Dict]:
         """Group entities into records without filtering"""
         records = []
-        names = [e['value'] for e in entities if 'name' in e['type']]
-        mobiles = [e['value'] for e in entities if 'mobile' in e['type'] or 'phone' in e['type']]
-        addresses = [e['value'] for e in entities if 'address' in e['type']]
-        emails = [e['value'] for e in entities if 'email' in e['type']]
+        names = [e['value'] for e in entities if e['type'] == 'name']
+        mobiles = [e['value'] for e in entities if e['type'] == 'mobile']
+        addresses = [e['value'] for e in entities if e['type'] == 'address']
+        emails = [e['value'] for e in entities if e['type'] == 'email']
+        dateofbirths = [e['value'] for e in entities if e['type'] == 'dateofbirth']
+        landlines = [e['value'] for e in entities if e['type'] == 'landline']
+        lastseens = [e['value'] for e in entities if e['type'] == 'lastseen']
         
-        logger.info(f"Found: {len(names)} names, {len(mobiles)} mobiles, {len(addresses)} addresses, {len(emails)} emails")
+        logger.info(f"Found: {len(names)} names, {len(mobiles)} mobiles, {len(addresses)} addresses, {len(emails)} emails, {len(dateofbirths)} dateofbirths, {len(landlines)} landlines, {len(lastseens)} lastseens")
         
         # Debug: Show what entity types we found
         entity_types = [e['type'] for e in entities]
         logger.info(f"Entity types found: {set(entity_types)}")
         
-        max_count = max(len(names), len(mobiles), len(addresses), len(emails)) if any([names, mobiles, addresses, emails]) else 0
+        max_count = max(len(names), len(mobiles), len(addresses), len(emails), len(dateofbirths), len(landlines), len(lastseens)) if any([names, mobiles, addresses, emails, dateofbirths, landlines, lastseens]) else 0
         
         for i in range(max_count):
             record = {}
@@ -130,6 +124,12 @@ class WorkingDocumentProcessor:
                 record['address'] = addresses[i]
             if i < len(emails):
                 record['email'] = emails[i]
+            if i < len(dateofbirths):
+                record['dateofbirth'] = dateofbirths[i]
+            if i < len(landlines):
+                record['landline'] = landlines[i]
+            if i < len(lastseens):
+                record['lastseen'] = lastseens[i]
             
             if record.get('first_name'):
                 records.append(record)
@@ -187,20 +187,17 @@ class WorkingDocumentProcessor:
         clean_records = []
         
         for record in records:
-            name = record.get('name', '').strip()
+            first_name = record.get('first_name', '').strip()
+            last_name = record.get('last_name', '').strip()
             mobile = record.get('mobile', '').strip()  
             address = record.get('address', '').strip()
             email = record.get('email', '').strip()
+            dateofbirth = record.get('dateofbirth', '').strip()
+            landline = record.get('landline', '').strip()
+            lastseen = record.get('lastseen', '').strip()
             
-            if not name:
+            if not first_name:
                 continue
-            
-            name_parts = name.split()
-            if len(name_parts) < 2:
-                continue
-                
-            first_name = name_parts[0]
-            last_name = name_parts[1] 
             
             if len(first_name) <= 1:
                 continue
@@ -212,7 +209,7 @@ class WorkingDocumentProcessor:
             if not (len(mobile_digits) == 10 and mobile_digits.startswith('04')):
                 continue
 
-            if not address or not re.search(r'\d', address[:10]):
+            if not address or not re.search(r'\d', address[:15]):
                 continue
             
             # Fix address ordering
@@ -223,7 +220,10 @@ class WorkingDocumentProcessor:
                 'last_name': last_name, 
                 'mobile': mobile_digits,
                 'address': fixed_address,
-                'email': email if email else ''
+                'email': email if email else '',
+                'dateofbirth': dateofbirth if dateofbirth else '',
+                'landline': landline if landline else '',
+                'lastseen': lastseen if lastseen else ''
             })
         
         # Remove duplicates based on mobile
@@ -271,7 +271,7 @@ class WorkingDocumentProcessor:
         df = pd.DataFrame(records)
         
         # Standardize column order
-        standard_columns = ['first_name', 'last_name', 'mobile', 'address', 'email']
+        standard_columns = ['first_name', 'last_name', 'mobile', 'address', 'email', 'dateofbirth', 'landline', 'lastseen']
         if include_metadata:
             standard_columns.extend(['file_name', 'extraction_date'])
         
@@ -291,7 +291,7 @@ class WorkingDocumentProcessor:
         df = pd.DataFrame(records)
         
         # Standardize column order
-        standard_columns = ['first_name', 'last_name', 'mobile', 'address', 'email']
+        standard_columns = ['first_name', 'last_name', 'mobile', 'address', 'email', 'dateofbirth', 'landline', 'lastseen']
         if include_metadata:
             standard_columns.extend(['file_name', 'extraction_date'])
         
@@ -325,174 +325,3 @@ class WorkingDocumentProcessor:
             'total_raw': len(all_raw_records),
             'total_filtered': len(all_filtered_records)
         }
-
-    def _init_database(self):
-        """Initialize database connection"""
-        try:
-            self.db_connection = psycopg2.connect(
-                host=self.db_config['host'],
-                port=self.db_config['port'],
-                database=self.db_config['database'],
-                user=self.db_config['user'],
-                password=self.db_config['password']
-            )
-            logger.info("Database connection established")
-        except Exception as e:
-            logger.error(f"Failed to connect to database: {e}")
-            self.db_connection = None
-
-    def _get_db_connection(self):
-        """Get database connection, reconnect if needed"""
-        if not self.db_connection or self.db_connection.closed:
-            self._init_database()
-        return self.db_connection
-
-    def save_to_database(self, raw_records: List[Dict], filtered_records: List[Dict], 
-                        file_name: str, session_name: str = None) -> bool:
-        """Save records to database"""
-        if not self.db_connection:
-            logger.warning("No database connection available")
-            return False
-        
-        try:
-            conn = self._get_db_connection()
-            cursor = conn.cursor()
-            
-            # Create session if provided
-            session_id = None
-            if session_name:
-                cursor.execute("""
-                    INSERT INTO processing_sessions (session_name, total_files, raw_records_count, filtered_records_count)
-                    VALUES (%s, %s, %s, %s) RETURNING id
-                """, (session_name, 1, len(raw_records), len(filtered_records)))
-                session_id = cursor.fetchone()[0]
-            
-            # Insert raw records
-            for record in raw_records:
-                # Create full_name from first_name and last_name
-                first_name = record.get('first_name', '')
-                last_name = record.get('last_name', '')
-                full_name = f"{first_name} {last_name}".strip() if first_name or last_name else ''
-                
-                cursor.execute("""
-                    INSERT INTO raw_records (file_name, full_name, first_name, last_name, mobile, 
-                                           landline, email, address, date_of_birth, last_seen)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    file_name,
-                    full_name,
-                    first_name,
-                    last_name,
-                    record.get('mobile', ''),
-                    record.get('landline', ''),
-                    record.get('email', ''),
-                    record.get('address', ''),
-                    record.get('date_of_birth', ''),
-                    record.get('last_seen', '')
-                ))
-            
-            # Insert filtered records (with duplicate handling)
-            for record in filtered_records:
-                cursor.execute("""
-                    INSERT INTO filtered_records (file_name, first_name, last_name, mobile, 
-                                                landline, email, address)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (mobile) DO UPDATE SET
-                        file_name = EXCLUDED.file_name,
-                        first_name = EXCLUDED.first_name,
-                        last_name = EXCLUDED.last_name,
-                        landline = EXCLUDED.landline,
-                        email = EXCLUDED.email,
-                        address = EXCLUDED.address,
-                        updated_at = CURRENT_TIMESTAMP
-                """, (
-                    file_name,
-                    record.get('first_name', ''),
-                    record.get('last_name', ''),
-                    record.get('mobile', ''),
-                    record.get('landline', ''),
-                    record.get('email', ''),
-                    record.get('address', '')
-                ))
-            
-            conn.commit()
-            logger.info(f"Saved {len(raw_records)} raw and {len(filtered_records)} filtered records to database")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error saving to database: {e}")
-            if conn:
-                conn.rollback()
-            return False
-        finally:
-            if cursor:
-                cursor.close()
-
-    def get_records_from_database(self, record_type: str = 'filtered', limit: int = 1000) -> List[Dict]:
-        """Get records from database"""
-        if not self.db_connection:
-            logger.warning("No database connection available")
-            return []
-        
-        try:
-            conn = self._get_db_connection()
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
-            
-            table_name = f"{record_type}_records"
-            cursor.execute(f"""
-                SELECT * FROM {table_name} 
-                ORDER BY created_at DESC 
-                LIMIT %s
-            """, (limit,))
-            
-            records = cursor.fetchall()
-            return [dict(record) for record in records]
-            
-        except Exception as e:
-            logger.error(f"Error getting records from database: {e}")
-            return []
-        finally:
-            if cursor:
-                cursor.close()
-
-    def get_database_stats(self) -> Dict:
-        """Get database statistics"""
-        if not self.db_connection:
-            return {}
-        
-        try:
-            conn = self._get_db_connection()
-            cursor = conn.cursor()
-            
-            # Get counts
-            cursor.execute("SELECT COUNT(*) FROM raw_records")
-            raw_count = cursor.fetchone()[0]
-            
-            cursor.execute("SELECT COUNT(*) FROM filtered_records")
-            filtered_count = cursor.fetchone()[0]
-            
-            cursor.execute("SELECT COUNT(DISTINCT file_name) FROM raw_records")
-            file_count = cursor.fetchone()[0]
-            
-            cursor.execute("SELECT COUNT(DISTINCT mobile) FROM filtered_records")
-            unique_mobiles = cursor.fetchone()[0]
-            
-            return {
-                'raw_records': raw_count,
-                'filtered_records': filtered_count,
-                'files_processed': file_count,
-                'unique_mobiles': unique_mobiles
-            }
-            
-        except Exception as e:
-            logger.error(f"Error getting database stats: {e}")
-            return {}
-        finally:
-            if cursor:
-                cursor.close()
-
-    def close_database(self):
-        """Close database connection"""
-        if self.db_connection:
-            self.db_connection.close()
-            self.db_connection = None
