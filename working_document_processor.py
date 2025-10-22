@@ -22,8 +22,8 @@ class WorkingDocumentProcessor:
         opts = ClientOptions(api_endpoint=f"{location}-documentai.googleapis.com")
         self.client = documentai.DocumentProcessorServiceClient(client_options=opts)
     
-    def process_document(self, file_path: str) -> List[Dict]:
-        """Process a single document and return both raw and filtered records"""
+    def process_document(self, file_path: str) -> Dict:
+        """Process a single document and return both raw and filtered records with JSON data"""
         logger.info(f"Processing document: {file_path}")
 
         document = self._call_custom_extractor(file_path, self.processor_id)
@@ -33,7 +33,13 @@ class WorkingDocumentProcessor:
         
         if len(entities) == 0:
             logger.error("❌ NO ENTITIES FOUND - Check processor ID and document format")
-            return []
+            return {
+                'raw_records': [],
+                'filtered_records': [],
+                'file_name': os.path.basename(file_path),
+                'pre_processing_json': {},
+                'post_processing_json': {}
+            }
         
         # Get raw records (no filtering)
         raw_records = self._simple_grouping(entities)
@@ -43,11 +49,55 @@ class WorkingDocumentProcessor:
         filtered_records = self._clean_and_validate(raw_records)
         logger.info(f"Filtered records: {len(filtered_records)}")
         
-        # Return both raw and filtered
+        # Create pre-processing JSON (raw Document AI entities)
+        pre_processing_json = {
+            'file_name': os.path.basename(file_path),
+            'processing_timestamp': pd.Timestamp.now().isoformat(),
+            'document_ai_entities': entities,
+            'total_entities': len(entities),
+            'entity_types': list(set([e['type'] for e in entities])),
+            'raw_text': document.text if hasattr(document, 'text') else '',
+            'metadata': {
+                'processor_id': self.processor_id,
+                'project_id': self.project_id,
+                'location': self.location
+            }
+        }
+        
+        # Create post-processing JSON (processed records)
+        post_processing_json = {
+            'file_name': os.path.basename(file_path),
+            'processing_timestamp': pd.Timestamp.now().isoformat(),
+            'raw_records': raw_records,
+            'filtered_records': filtered_records,
+            'summary': {
+                'total_raw_records': len(raw_records),
+                'total_filtered_records': len(filtered_records),
+                'success_rate': f"{(len(filtered_records)/len(raw_records)*100):.1f}%" if raw_records else "0%"
+            },
+            'field_counts': {
+                'names': len([r for r in raw_records if r.get('first_name')]),
+                'mobiles': len([r for r in raw_records if r.get('mobile')]),
+                'addresses': len([r for r in raw_records if r.get('address')]),
+                'emails': len([r for r in raw_records if r.get('email')]),
+                'dateofbirths': len([r for r in raw_records if r.get('dateofbirth')]),
+                'landlines': len([r for r in raw_records if r.get('landline')]),
+                'lastseens': len([r for r in raw_records if r.get('lastseen')])
+            },
+            'metadata': {
+                'processor_id': self.processor_id,
+                'project_id': self.project_id,
+                'location': self.location
+            }
+        }
+        
+        # Return both raw and filtered with JSON data
         return {
             'raw_records': raw_records,
             'filtered_records': filtered_records,
-            'file_name': os.path.basename(file_path)
+            'file_name': os.path.basename(file_path),
+            'pre_processing_json': pre_processing_json,
+            'post_processing_json': post_processing_json
         }
     
     def _call_custom_extractor(self, file_path: str, processor_id: str):

@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import pandas as pd
 import io
+import json
 from dotenv import load_dotenv
 from working_document_processor import WorkingDocumentProcessor
 import tempfile
@@ -64,6 +65,8 @@ if uploaded_files:
 
         all_raw_records = []
         all_filtered_records = []
+        all_pre_processing_json = []
+        all_post_processing_json = []
         processed_file_count = 0
         total_files = len(uploaded_files)
         progress_bar = st.progress(0)
@@ -89,6 +92,13 @@ if uploaded_files:
                         
                     all_raw_records.extend(result['raw_records'])
                     all_filtered_records.extend(result['filtered_records'])
+                    
+                    # Collect JSON data
+                    if result.get('pre_processing_json'):
+                        all_pre_processing_json.append(result['pre_processing_json'])
+                    if result.get('post_processing_json'):
+                        all_post_processing_json.append(result['post_processing_json'])
+                        
                 processed_file_count += 1
                 os.remove(tmp_file_path) # Clean up temp file
 
@@ -125,7 +135,7 @@ if uploaded_files:
             # Download options
             st.subheader("📥 Download Results")
 
-            # Create ZIP file with both raw and filtered data
+            # Create ZIP file with both raw and filtered data plus JSON
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
                 # Add raw CSV
@@ -139,6 +149,38 @@ if uploaded_files:
                     filtered_csv = io.StringIO()
                     filtered_df.to_csv(filtered_csv, index=False)
                     zip_file.writestr("filtered_data.csv", filtered_csv.getvalue())
+                
+                # Add individual JSON files
+                for i, json_data in enumerate(all_pre_processing_json):
+                    filename = json_data.get('file_name', f'file_{i+1}')
+                    json_name = filename.replace('.pdf', '_pre.json')
+                    zip_file.writestr(f"json/{json_name}", json.dumps(json_data, indent=2))
+                
+                for i, json_data in enumerate(all_post_processing_json):
+                    filename = json_data.get('file_name', f'file_{i+1}')
+                    json_name = filename.replace('.pdf', '_post.json')
+                    zip_file.writestr(f"json/{json_name}", json.dumps(json_data, indent=2))
+                
+                # Add combined JSON files
+                if all_pre_processing_json:
+                    combined_pre_json = {
+                        'processing_session': {
+                            'total_files': processed_file_count,
+                            'timestamp': pd.Timestamp.now().isoformat()
+                        },
+                        'files': all_pre_processing_json
+                    }
+                    zip_file.writestr("combined_pre_processing.json", json.dumps(combined_pre_json, indent=2))
+                
+                if all_post_processing_json:
+                    combined_post_json = {
+                        'processing_session': {
+                            'total_files': processed_file_count,
+                            'timestamp': pd.Timestamp.now().isoformat()
+                        },
+                        'files': all_post_processing_json
+                    }
+                    zip_file.writestr("combined_post_processing.json", json.dumps(combined_post_json, indent=2))
                 
                 # Add summary
                 summary_data = {
@@ -226,6 +268,73 @@ if uploaded_files:
             with col3:
                 # Empty column for alignment
                 pass
+
+            # Row 3: JSON files
+            if all_pre_processing_json or all_post_processing_json:
+                st.subheader("📄 JSON Downloads")
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    if all_pre_processing_json:
+                        # Individual pre-processing JSON files
+                        for i, json_data in enumerate(all_pre_processing_json):
+                            filename = json_data.get('file_name', f'file_{i+1}')
+                            json_name = filename.replace('.pdf', '_pre.json')
+                            st.download_button(
+                                label=f"📄 {json_name}",
+                                data=json.dumps(json_data, indent=2),
+                                file_name=json_name,
+                                mime="application/json",
+                                key=f"pre_json_{i}"
+                            )
+                
+                with col2:
+                    if all_post_processing_json:
+                        # Individual post-processing JSON files
+                        for i, json_data in enumerate(all_post_processing_json):
+                            filename = json_data.get('file_name', f'file_{i+1}')
+                            json_name = filename.replace('.pdf', '_post.json')
+                            st.download_button(
+                                label=f"📄 {json_name}",
+                                data=json.dumps(json_data, indent=2),
+                                file_name=json_name,
+                                mime="application/json",
+                                key=f"post_json_{i}"
+                            )
+                
+                with col3:
+                    if all_pre_processing_json:
+                        # Combined pre-processing JSON
+                        combined_pre_json = {
+                            'processing_session': {
+                                'total_files': processed_file_count,
+                                'timestamp': pd.Timestamp.now().isoformat()
+                            },
+                            'files': all_pre_processing_json
+                        }
+                        st.download_button(
+                            label="📄 Combined Pre JSON",
+                            data=json.dumps(combined_pre_json, indent=2),
+                            file_name="combined_pre_processing.json",
+                            mime="application/json"
+                        )
+                
+                with col4:
+                    if all_post_processing_json:
+                        # Combined post-processing JSON
+                        combined_post_json = {
+                            'processing_session': {
+                                'total_files': processed_file_count,
+                                'timestamp': pd.Timestamp.now().isoformat()
+                            },
+                            'files': all_post_processing_json
+                        }
+                        st.download_button(
+                            label="📄 Combined Post JSON",
+                            data=json.dumps(combined_post_json, indent=2),
+                            file_name="combined_post_processing.json",
+                            mime="application/json"
+                        )
 
             # Show duplicate detection info
             if ENABLE_DUPLICATE_DETECTION and all_filtered_records and 'mobile' in filtered_df.columns:
