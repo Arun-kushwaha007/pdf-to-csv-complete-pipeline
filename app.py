@@ -7,6 +7,7 @@ from working_document_processor import WorkingDocumentProcessor
 import tempfile
 import zipfile
 import logging
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -23,6 +24,13 @@ CREDENTIALS_PATH = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
 OUTPUT_DIR = os.getenv('OUTPUT_DIR', 'output')
 ENABLE_DUPLICATE_DETECTION = os.getenv('ENABLE_DUPLICATE_DETECTION', 'true').lower() == 'true'
 DUPLICATE_KEY_FIELD = os.getenv('DUPLICATE_KEY_FIELD', 'mobile')
+
+# Database configuration
+DB_HOST = os.getenv('DB_HOST')
+DB_PORT = os.getenv('DB_PORT', '5432')
+DB_NAME = os.getenv('DB_NAME')
+DB_USER = os.getenv('DB_USER')
+DB_PASSWORD = os.getenv('DB_PASSWORD')
 
 # --- Streamlit App ---
 st.set_page_config(layout="wide", page_title="PDF to CSV/Excel Processor")
@@ -41,15 +49,29 @@ if not all([PROJECT_ID, LOCATION, PROCESSOR_ID, CREDENTIALS_PATH]):
     st.sidebar.error("🚨 Missing environment variables! Please check `config.env`.")
     st.stop()
 
-# Initialize processor
+# Initialize processor with database
+db_config = None
+if all([DB_HOST, DB_NAME, DB_USER, DB_PASSWORD]):
+    db_config = {
+        'host': DB_HOST,
+        'port': int(DB_PORT),
+        'database': DB_NAME,
+        'user': DB_USER,
+        'password': DB_PASSWORD
+    }
+
 try:
     processor = WorkingDocumentProcessor(
         project_id=PROJECT_ID,
         location=LOCATION,
         processor_id=PROCESSOR_ID,
-        credentials_path=CREDENTIALS_PATH
+        credentials_path=CREDENTIALS_PATH,
+        db_config=db_config
     )
-    st.sidebar.success("✅ Document Processor Initialized!")
+    if db_config:
+        st.sidebar.success("✅ Document Processor + Database Initialized!")
+    else:
+        st.sidebar.success("✅ Document Processor Initialized! (No DB)")
 except Exception as e:
     st.sidebar.error(f"❌ Failed to initialize Document Processor: {e}")
     st.stop()
@@ -99,6 +121,23 @@ if uploaded_files:
                     os.remove(tmp_file_path)
 
         status_text.success(f"✅ Processed {processed_file_count} of {total_files} files.")
+
+        # Save to database if connected
+        if db_config and (all_raw_records or all_filtered_records):
+            session_name = f"Batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            for i, uploaded_file in enumerate(uploaded_files):
+                # Get records for this specific file
+                file_raw = [r for r in all_raw_records if r.get('file_name') == uploaded_file.name]
+                file_filtered = [r for r in all_filtered_records if r.get('file_name') == uploaded_file.name]
+                
+                if file_raw or file_filtered:
+                    processor.save_to_database(
+                        raw_records=file_raw,
+                        filtered_records=file_filtered,
+                        file_name=uploaded_file.name,
+                        session_name=session_name if i == 0 else None
+                    )
+            st.success("💾 Data saved to database!")
 
         # Display results
         if all_raw_records or all_filtered_records:
@@ -230,6 +269,74 @@ if uploaded_files:
                 )
         else:
             st.warning("No records extracted from the uploaded files.")
+
+# Database Records Section
+if db_config:
+    st.markdown("---")
+    st.header("🗄️ Database Records")
+    
+    # Database stats
+    stats = processor.get_database_stats()
+    if stats:
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Raw Records", stats.get('raw_records', 0))
+        with col2:
+            st.metric("Filtered Records", stats.get('filtered_records', 0))
+        with col3:
+            st.metric("Files Processed", stats.get('files_processed', 0))
+        with col4:
+            st.metric("Unique Mobiles", stats.get('unique_mobiles', 0))
+    
+    # Toggle between raw and filtered
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        view_type = st.selectbox("View Records", ["Filtered", "Raw"], index=0)
+    with col2:
+        limit = st.slider("Number of records to show", 10, 1000, 100)
+    
+    # Load and display records
+    if st.button(f"Load {view_type} Records from Database"):
+        record_type = view_type.lower()
+        records = processor.get_records_from_database(record_type, limit)
+        
+        if records:
+            df = pd.DataFrame(records)
+            
+            # Remove internal database fields for display
+            display_columns = [col for col in df.columns if col not in ['id', 'created_at', 'updated_at']]
+            display_df = df[display_columns]
+            
+            st.dataframe(display_df, use_container_width=True)
+            
+            # Download options for database records
+            st.subheader(f"📥 Download {view_type} Records")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                csv_buffer = io.StringIO()
+                display_df.to_csv(csv_buffer, index=False)
+                st.download_button(
+                    label=f"📄 Download {view_type} CSV",
+                    data=csv_buffer.getvalue(),
+                    file_name=f"{record_type}_records.csv",
+                    mime="text/csv",
+                )
+            
+            with col2:
+                excel_buffer = io.BytesIO()
+                with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                    display_df.to_excel(writer, sheet_name=f'{view_type} Records', index=False)
+                
+                st.download_button(
+                    label=f"📊 Download {view_type} Excel",
+                    data=excel_buffer.getvalue(),
+                    file_name=f"{record_type}_records.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+        else:
+            st.info(f"No {view_type} records found in database.")
 
 # Footer
 st.markdown("---")
