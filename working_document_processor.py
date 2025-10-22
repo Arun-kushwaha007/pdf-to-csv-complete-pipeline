@@ -82,11 +82,18 @@ class WorkingDocumentProcessor:
         entities = []
         
         for entity in document.entities:
+            entity_type = entity.type_.lower().strip()
+            entity_value = entity.mention_text.strip()
+            
+            # Debug logging
+            logger.info(f"Entity found: type='{entity_type}', value='{entity_value}'")
+            
             entities.append({
-                'type': entity.type_.lower().strip(),
-                'value': entity.mention_text.strip()
+                'type': entity_type,
+                'value': entity_value
             })
         
+        logger.info(f"Total entities extracted: {len(entities)}")
         return entities
     
     def _simple_grouping(self, entities: List[Dict]) -> List[Dict]:
@@ -98,13 +105,25 @@ class WorkingDocumentProcessor:
         emails = [e['value'] for e in entities if 'email' in e['type']]
         
         logger.info(f"Found: {len(names)} names, {len(mobiles)} mobiles, {len(addresses)} addresses, {len(emails)} emails")
+        
+        # Debug: Show what entity types we found
+        entity_types = [e['type'] for e in entities]
+        logger.info(f"Entity types found: {set(entity_types)}")
+        
         max_count = max(len(names), len(mobiles), len(addresses), len(emails)) if any([names, mobiles, addresses, emails]) else 0
         
         for i in range(max_count):
             record = {}
             
             if i < len(names):
-                record['name'] = names[i]
+                # Split name into first and last
+                name_parts = names[i].split()
+                if len(name_parts) >= 2:
+                    record['first_name'] = name_parts[0]
+                    record['last_name'] = ' '.join(name_parts[1:])
+                else:
+                    record['first_name'] = names[i]
+                    record['last_name'] = ''
             if i < len(mobiles):
                 record['mobile'] = mobiles[i]
             if i < len(addresses):
@@ -112,9 +131,11 @@ class WorkingDocumentProcessor:
             if i < len(emails):
                 record['email'] = emails[i]
             
-            if record.get('name'):
+            if record.get('first_name'):
                 records.append(record)
+                logger.info(f"Created record {i+1}: {record}")
         
+        logger.info(f"Created {len(records)} records total")
         return records
     
     def _fix_address_ordering(self, address: str) -> str:
@@ -348,15 +369,20 @@ class WorkingDocumentProcessor:
             
             # Insert raw records
             for record in raw_records:
+                # Create full_name from first_name and last_name
+                first_name = record.get('first_name', '')
+                last_name = record.get('last_name', '')
+                full_name = f"{first_name} {last_name}".strip() if first_name or last_name else ''
+                
                 cursor.execute("""
                     INSERT INTO raw_records (file_name, full_name, first_name, last_name, mobile, 
                                            landline, email, address, date_of_birth, last_seen)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (
                     file_name,
-                    record.get('name', ''),
-                    record.get('first_name', ''),
-                    record.get('last_name', ''),
+                    full_name,
+                    first_name,
+                    last_name,
                     record.get('mobile', ''),
                     record.get('landline', ''),
                     record.get('email', ''),
