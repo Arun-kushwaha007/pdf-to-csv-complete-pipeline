@@ -108,6 +108,50 @@ class WorkingDocumentProcessor:
         
         return records
     
+    def _fix_address_ordering(self, address: str) -> str:
+        """Fix address ordering where postcode/state appears before street address"""
+        if not address:
+            return address
+            
+        address = address.strip()
+        
+        # Pattern 1: Postcode and state at the beginning
+        # Matches: NSW 2289 114 Northcott Drive ADAMSTOWN HEIGHTS
+        postcode_state_pattern = r'^([A-Z]{2,3}\s+\d{4})\s+(.+)$'
+        match = re.match(postcode_state_pattern, address)
+        
+        if match:
+            postcode_state = match.group(1)  # NSW 2289
+            street_address = match.group(2)  # 114 Northcott Drive ADAMSTOWN HEIGHTS
+            # Reorder: street_address + postcode_state
+            return f"{street_address} {postcode_state}"
+        
+        # Pattern 2: Postcode at the beginning without state
+        # Matches: 2289 114 Northcott Drive ADAMSTOWN HEIGHTS NSW
+        postcode_only_pattern = r'^(\d{4})\s+(.+?)\s+([A-Z]{2,3})$'
+        match = re.match(postcode_only_pattern, address)
+        
+        if match:
+            postcode = match.group(1)  # 2289
+            street_address = match.group(2)  # 114 Northcott Drive ADAMSTOWN HEIGHTS
+            state = match.group(3)  # NSW
+            # Reorder: street_address + state + postcode
+            return f"{street_address} {state} {postcode}"
+        
+        # Pattern 3: State and postcode in the middle
+        # Matches: 114 Northcott Drive NSW 2289 ADAMSTOWN HEIGHTS
+        state_postcode_middle_pattern = r'^(.+?)\s+([A-Z]{2,3}\s+\d{4})\s+(.+)$'
+        match = re.match(state_postcode_middle_pattern, address)
+        
+        if match:
+            street_part1 = match.group(1)  # 114 Northcott Drive
+            state_postcode = match.group(2)  # NSW 2289
+            street_part2 = match.group(3)  # ADAMSTOWN HEIGHTS
+            # Reorder: street_part1 + street_part2 + state_postcode
+            return f"{street_part1} {street_part2} {state_postcode}"
+        
+        return address
+
     def _clean_and_validate(self, records: List[Dict]) -> List[Dict]:
         """Clean validation - mobile required, proper name format, address validation"""
         clean_records = []
@@ -138,14 +182,17 @@ class WorkingDocumentProcessor:
             if not (len(mobile_digits) == 10 and mobile_digits.startswith('04')):
                 continue
 
-            if not address or not re.search(r'\d', address[:5]):
+            if not address or not re.search(r'\d', address[:10]):
                 continue
+            
+            # Fix address ordering
+            fixed_address = self._fix_address_ordering(address)
             
             clean_records.append({
                 'first_name': first_name,
                 'last_name': last_name, 
                 'mobile': mobile_digits,
-                'address': address,
+                'address': fixed_address,
                 'email': email if email else ''
             })
         
