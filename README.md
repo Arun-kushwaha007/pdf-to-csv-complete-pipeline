@@ -1,86 +1,132 @@
-# PDF to CSV Pipeline - FastAPI + React
+# Working Document Processor
 
-A modern, robust web application for processing PDF documents and extracting contact information using Google Cloud Document AI.
+Original document processor for extracting contact information from PDFs using Google Cloud Document AI with relaxed address regex.
 
-## 🚀 Quick Start
+## Features
 
-### Local Development
-```bash
-# Install dependencies
-pip install -r requirements.txt
+- **Document AI Integration**: Uses Google Cloud Document AI for entity extraction
+- **Relaxed Address Regex**: More flexible address pattern matching
+- **Multiple Output Formats**: CSV and Excel output with summary sheets
+- **Duplicate Detection**: Find duplicate records based on mobile numbers
+- **Name Parsing**: Intelligent name parsing with fallback logic
+- **Phone Validation**: Clean and validate phone numbers using phonenumbers library
 
-# Start the application
-python start_local.py
+## Setup
+
+1. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Configure environment**:
+   - Copy `config.env` and update with your settings
+   - Add your Google Cloud credentials JSON file
+   - Set your Document AI processor ID
+
+3. **Run processing**:
+   ```bash
+   # Command line processing
+   python process_documents.py
+   
+   # Or use the Streamlit web app
+   python run_app.py
+   ```
+
+## Configuration
+
+Edit `config.env`:
+```env
+PROJECT_ID=your-project-id
+LOCATION=us
+PROCESSOR_ID=your-processor-id
+GOOGLE_APPLICATION_CREDENTIALS=./credentials.json
+OUTPUT_DIR=output
+CSV_FILENAME=extracted_data.csv
+EXCEL_FILENAME=extracted_data.xlsx
+ENABLE_DUPLICATE_DETECTION=true
+DUPLICATE_KEY_FIELD=mobile
 ```
 
-### Deploy to Google Cloud
-```bash
-# Run the deployment script
-python deploy_fastapi.py
+## Usage
+
+```python
+from working_document_processor import DocumentProcessor
+
+# Initialize processor
+processor = DocumentProcessor(
+    project_id="your-project-id",
+    location="us",
+    processor_id="your-processor-id",
+    credentials_path="credentials.json"
+)
+
+# Process documents
+results = processor.process_multiple_documents(["file1.pdf", "file2.pdf"])
+
+# Save results
+processor.save_to_csv(results, "output.csv")
+processor.save_to_excel(results, "output.xlsx")
+
+# Detect duplicates
+duplicates = processor.detect_duplicates(results)
 ```
 
-## 📁 Project Structure
+## Key Features
 
-```
-├── main.py                 # FastAPI application entry point
-├── requirements.txt        # Python dependencies
-├── config.env             # Environment configuration
-├── deploy_fastapi.py      # Deployment script
-├── start_local.py         # Local development script
-├── .dockerignore          # Docker ignore file
-├── api/                   # API endpoints
-│   ├── collections.py
-│   ├── files.py
-│   ├── records.py
-│   └── exports.py
-├── models/                # Database models
-│   ├── database.py
-│   └── schemas.py
-├── services/              # Business logic
-│   ├── document_processor.py
-│   ├── duplicate_detector.py
-│   ├── export_service.py
-│   └── ...
-├── utils/                 # Utilities
-│   ├── config.py
-│   └── storage.py
-└── frontend/              # React frontend
-    ├── src/
-    ├── public/
-    └── package.json
-```
+### Relaxed Address Regex
+- **Original Patterns**: Keeps all original regex patterns
+- **Enhanced Address**: More flexible address pattern matching
+- **Multiple Formats**: Supports various address formats and abbreviations
 
-## 🔧 Configuration
+### Smart Data Processing
+- **Name Parsing**: Uses nameparser with intelligent fallback
+- **Phone Cleaning**: Automatic country code addition and validation
+- **Data Combination**: Merges Document AI entities with regex extraction
+- **Error Handling**: Robust error handling with detailed logging
 
-Update `config.env` with your settings:
-- Google Cloud project ID
-- Database credentials
-- Document AI processor ID
+### Output Options
+- **CSV**: Clean, structured CSV output
+- **Excel**: Multi-sheet Excel with summary statistics
+- **Duplicate Detection**: Separate file for duplicate records
 
-## 📚 API Documentation
+## Files
 
-Once running, visit:
-- **API Docs**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+- `working_document_processor.py` - Main processor class (original with relaxed address regex)
+- `app.py` - Streamlit web app for easy testing
+- `run_app.py` - Script to run the Streamlit app
+- `run_app.bat` - Windows batch file to run the app
+- `process_documents.py` - Simple usage example
+- `batch_process.py` - Batch processing for multiple PDFs
+- `config.env` - Configuration file
+- `requirements.txt` - Python dependencies
+- `README.md` - This file
 
-## 🌐 Frontend
+## Streamlit Web App
 
-The React frontend is built and served by the FastAPI backend.
-- Modern UI with dark/light theme
-- Real-time processing updates
-- File upload with drag & drop
-- Records management
-- Export functionality
+The easiest way to test the document processor is using the Streamlit web app:
 
-## 🚀 Deployment
+1. **Run the app**:
+   ```bash
+   python run_app.py
+   ```
 
-The deployment script handles:
-- Google Cloud API enablement
-- Cloud SQL setup
-- Frontend build
-- Docker container creation
-- Cloud Run deployment
+2. **Open your browser** to `http://localhost:8501`
 
-## 📖 Full Documentation
+3. **Upload PDF files** and click "Process Files"
 
-See `README_FASTAPI.md` for complete documentation.
+4. **Download results** as CSV or Excel
+
+### Features:
+- ✅ Upload multiple PDF files
+- ✅ Real-time processing status
+- ✅ Results preview
+- ✅ Download as CSV or Excel
+- ✅ Duplicate detection
+- ✅ Error handling and reporting
+
+## Requirements
+
+- Python 3.7+
+- Google Cloud Project with Document AI enabled
+- Service account credentials
+- Document AI processor configured
